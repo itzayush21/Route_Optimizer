@@ -20,4 +20,6 @@ boto3
 botocore
 pytest
 haversine
+scikit-learn
+sklearn
 gunicorn
