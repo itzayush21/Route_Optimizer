@@ -5,6 +5,7 @@ Flask-Migrate
 Flask-Cors
 Flask-Session
 
+
 # Database + ORM
 SQLAlchemy
 psycopg2-binary   # for Postgres (if used)
@@ -14,6 +15,7 @@ PyMySQL           # for MySQL (if used)
 pandas
 numpy
 ortools           # Google OR-Tools for VRP
+supabase
 
 # LLM / Gemini
 google-generativeai
