@@ -1,8 +1,11 @@
 import google.generativeai as genai
 import json
 import re
+import os
+from dotenv import load_dotenv
+load_dotenv()
 
-genai.configure(api_key="AIzaSyDgXXIWAQbUeBQHBU03V6pkv3tuV1OWuUc")
+genai.configure(api_key=os.getenv("GEMINI_API_KEY", "YOUR_DEFAULT_KEY"))
 
 
 def build_prompt_from_payload(payload):

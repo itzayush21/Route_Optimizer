@@ -31,3 +31,4 @@ markdown
 # Optional testing
 pytest
 gunicorn
+boto3
