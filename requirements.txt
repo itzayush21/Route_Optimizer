@@ -21,5 +21,4 @@ botocore
 pytest
 haversine
 scikit-learn
-sklearn
 gunicorn
