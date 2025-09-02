@@ -19,4 +19,5 @@ markdown
 boto3
 botocore
 pytest
+haversine
 gunicorn
