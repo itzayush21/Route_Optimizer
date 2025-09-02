@@ -1,0 +1,33 @@
+# Core web framework
+Flask
+Flask-SQLAlchemy
+Flask-Migrate
+Flask-Cors
+Flask-Session
+
+# Database + ORM
+SQLAlchemy
+psycopg2-binary   # for Postgres (if used)
+PyMySQL           # for MySQL (if used)
+
+# Data / ML / VRP
+pandas
+numpy
+ortools           # Google OR-Tools for VRP
+
+# LLM / Gemini
+google-generativeai
+
+# Environment management
+python-dotenv
+
+# API requests / scraping
+requests
+beautifulsoup4
+
+# Utilities
+markdown
+
+# Optional testing
+pytest
+gunicorn
