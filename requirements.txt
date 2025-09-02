@@ -1,36 +1,44 @@
 # Core web framework
-Flask
-Flask-SQLAlchemy
-Flask-Migrate
-Flask-Cors
-Flask-Session
-
+Flask==3.0.3
+Flask-SQLAlchemy==3.1.1
+Flask-Migrate==4.0.7
+Flask-Cors==4.0.0
+Flask-Session==0.5.0
 
 # Database + ORM
-SQLAlchemy
-psycopg2-binary   # for Postgres (if used)
-PyMySQL           # for MySQL (if used)
+SQLAlchemy==2.0.32
+psycopg2-binary==2.9.9
+PyMySQL==1.1.1
 
 # Data / ML / VRP
-pandas
-numpy
-ortools           # Google OR-Tools for VRP
-supabase
+pandas==2.2.2
+numpy==1.26.4
+ortools==9.9.3963
 
 # LLM / Gemini
-google-generativeai
+google-generativeai==0.8.3
+
+# Supabase
+supabase==2.4.0
+postgrest==1.1.1
+httpx==0.27.0
+httpcore==1.0.5
 
 # Environment management
-python-dotenv
+python-dotenv==1.0.1
 
 # API requests / scraping
-requests
-beautifulsoup4
+requests==2.32.3
+beautifulsoup4==4.12.3
 
 # Utilities
-markdown
+uuid==1.30
+markdown==3.6
+
+# AWS SDK (if using S3)
+boto3==1.35.24
+botocore==1.35.24
 
 # Optional testing
-pytest
+pytest==8.3.3
 gunicorn
-boto3
