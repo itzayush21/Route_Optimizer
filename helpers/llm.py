@@ -2,7 +2,7 @@ import google.generativeai as genai
 import json
 import re
 
-genai.configure(api_key="AIzaSyDgXXIWAQbUeBQHBU03V6pkv3tuV1OWuUc")
+genai.configure(api_key="")
 
 
 def build_prompt_from_payload(payload):
