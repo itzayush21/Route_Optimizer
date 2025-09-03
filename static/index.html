@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Route Optimizer - Traffic-Aware Routing</title>
+    <script src='https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js'></script>
+    <link href='https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css' rel='stylesheet' />
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f5f5;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 1rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .header h1 {
+            margin: 0;
+            font-size: 1.5rem;
+        }
+        
+        .container {
+            display: flex;
+            height: calc(100vh - 80px);
+        }
+        
+        .sidebar {
+            width: 300px;
+            background: white;
+            box-shadow: 2px 0 4px rgba(0,0,0,0.1);
+            padding: 1rem;
+            overflow-y: auto;
+        }
+        
+        .map-container {
+            flex: 1;
+            position: relative;
+        }
+        
+        #map {
+            width: 100%;
+            height: 100%;
+        }
+        
+        .control-group {
+            margin-bottom: 1rem;
+        }
+        
+        .control-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .control-group input, .control-group select, .control-group textarea {
+            width: 100%;
+            padding: 0.5rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 0.9rem;
+        }
+        
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 0.75rem 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            width: 100%;
+            margin-bottom: 0.5rem;
+            transition: transform 0.2s;
+        }
+        
+        .btn:hover {
+            transform: translateY(-1px);
+        }
+        
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .route-info {
+            background: #f8f9fa;
+            padding: 0.75rem;
+            border-radius: 4px;
+            margin-bottom: 1rem;
+            border-left: 4px solid #667eea;
+        }
+        
+        .route-info h3 {
+            margin: 0 0 0.5rem 0;
+            color: #333;
+            font-size: 1rem;
+        }
+        
+        .metric {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.25rem;
+            font-size: 0.85rem;
+        }
+        
+        .metric .label {
+            color: #666;
+        }
+        
+        .metric .value {
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: #666;
+        }
+        
+        .loading::after {
+            content: "";
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-left: 10px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .error {
+            background: #fee;
+            color: #c33;
+            padding: 0.75rem;
+            border-radius: 4px;
+            margin-bottom: 1rem;
+            border-left: 4px solid #c33;
+        }
+        
+        .legend {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: white;
+            padding: 1rem;
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            font-size: 0.8rem;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+        
+        .legend-color {
+            width: 12px;
+            height: 12px;
+            margin-right: 0.5rem;
+            border-radius: 50%;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🚛 Route Optimizer - Real-Time Traffic Routing</h1>
+    </div>
+    
+    <div class="container">
+        <div class="sidebar">
+            <div class="control-group">
+                <label for="auth-email">Email:</label>
+                <input type="email" id="auth-email" placeholder="Enter your email">
+            </div>
+            
+            <div class="control-group">
+                <label for="auth-password">Password:</label>
+                <input type="password" id="auth-password" placeholder="Enter your password">
+            </div>
+            
+            <button class="btn" onclick="login()">🔐 Login</button>
+            
+            <hr style="margin: 1.5rem 0; border: none; border-top: 1px solid #eee;">
+            
+            <div class="control-group">
+                <label for="num-vehicles">Number of Vehicles:</label>
+                <input type="number" id="num-vehicles" value="3" min="1" max="10">
+            </div>
+            
+            <div class="control-group">
+                <label for="vehicle-capacity">Vehicle Capacity (kg):</label>
+                <input type="number" id="vehicle-capacity" value="200" min="50" max="1000">
+            </div>
+            
+            <div class="control-group">
+                <label for="preferences">Route Preferences:</label>
+                <textarea id="preferences" rows="3" placeholder="e.g., prioritize customer ABC, avoid downtown during rush hour, eco-friendly routing"></textarea>
+            </div>
+            
+            <button class="btn" onclick="optimizeRoutes()" disabled id="optimize-btn">🎯 Optimize Routes</button>
+            <button class="btn" onclick="loadLatestRoute()" disabled id="load-btn">📍 Load Latest Route</button>
+            
+            <div id="route-details"></div>
+        </div>
+        
+        <div class="map-container">
+            <div id="map"></div>
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #ff6b6b;"></div>
+                    <span>Depot</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #4ecdc4;"></div>
+                    <span>Customers</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #45b7d1;"></div>
+                    <span>Vehicle 1</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #96ceb4;"></div>
+                    <span>Vehicle 2</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #feca57;"></div>
+                    <span>Vehicle 3</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #ff9ff3;"></div>
+                    <span>Support Stations</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="static/app.js"></script>
+</body>
+</html>

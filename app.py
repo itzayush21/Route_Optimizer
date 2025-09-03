@@ -1,10 +1,11 @@
-from flask import Flask, jsonify, request, session
+from flask import Flask, jsonify, request, session, send_from_directory
+from flask_cors import CORS
 from auth.auth_client import create_supabase_client
 from config import Config
 from model import db, Customer, Order, User, Route , Node
 from datetime import datetime
 import pandas as pd
-import json,os
+import json,os,uuid
 from dotenv import load_dotenv
 from helpers.ortools import ortools_vrp
 from helpers.enrich import enrich_customers
@@ -27,6 +28,7 @@ load_dotenv()
 # 🔧 Flask App Setup
 # ------------------------------------------------
 app = Flask(__name__)
+CORS(app, supports_credentials=True)  # Enable CORS for frontend-backend communication
 app.secret_key = 'supersecretkey'  # TODO: replace with os.getenv("SECRET_KEY")
 S3_BUCKET = os.getenv("S3_BUCKET_NAME", "your-bucket-name")
 print("✅ Starting app.py DB setup...")
@@ -47,10 +49,20 @@ print("✅ Starting app.py imports...")
 
 @app.route("/", methods=["GET"])
 def index():
+    """Serve the frontend application"""
+    return send_from_directory('static', 'index.html')
+
+@app.route("/static/<path:filename>")
+def serve_static(filename):
+    """Serve static files"""
+    return send_from_directory('static', filename)
+
+@app.route("/api", methods=["GET"])
+def api_info():
     return jsonify({
         "status": "ok",
         "message": "Welcome to the VRP Backend API 🚀",
-        "available_endpoints": ["/api/signup", "/api/login", "/api/logout"]
+        "available_endpoints": ["/api/signup", "/api/login", "/api/logout", "/api/solve", "/api/routes/latest"]
     })
 
 @app.route('/api/signup', methods=['POST'])
@@ -402,6 +414,57 @@ def reset_nodes_to_pending():
         "status": "success",
         "message": f"{len(processed_nodes)} nodes reset to pending",
         "warehouse_id": user.warehouse
+    }), 200
+
+# ------------------------------------------------
+# 📍 Route Retrieval Endpoints for Frontend
+# ------------------------------------------------
+@app.route("/api/routes/latest", methods=["GET"])
+def get_latest_route():
+    """Get the latest route for the logged-in user."""
+    if "user" not in session:
+        return jsonify({"status": "error", "message": "Unauthorized"}), 401
+
+    supabase_uid = session["user"]["id"]
+    user = User.query.filter_by(user_id=supabase_uid).first()
+    if not user:
+        return jsonify({"status": "error", "message": "User not found"}), 404
+
+    # Get the latest route for this user
+    latest_route = Route.query.filter_by(user_id=user.id).order_by(desc(Route.created_at)).first()
+    if not latest_route:
+        return jsonify({"status": "error", "message": "No routes found for this user"}), 404
+
+    return jsonify({
+        "status": "success",
+        "trip_id": latest_route.trip_id,
+        "route_detail": latest_route.route_detail,
+        "summary": latest_route.summary,
+        "created_at": latest_route.created_at.isoformat()
+    }), 200
+
+@app.route("/api/routes/<trip_id>", methods=["GET"])
+def get_route_by_id(trip_id):
+    """Get a specific route by trip_id."""
+    if "user" not in session:
+        return jsonify({"status": "error", "message": "Unauthorized"}), 401
+
+    supabase_uid = session["user"]["id"]
+    user = User.query.filter_by(user_id=supabase_uid).first()
+    if not user:
+        return jsonify({"status": "error", "message": "User not found"}), 404
+
+    # Get the route by trip_id for this user
+    route = Route.query.filter_by(trip_id=trip_id, user_id=user.id).first()
+    if not route:
+        return jsonify({"status": "error", "message": "Route not found"}), 404
+
+    return jsonify({
+        "status": "success",
+        "trip_id": route.trip_id,
+        "route_detail": route.route_detail,
+        "summary": route.summary,
+        "created_at": route.created_at.isoformat()
     }), 200
     
 
