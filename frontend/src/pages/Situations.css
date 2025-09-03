@@ -1,0 +1,251 @@
+.situations-page {
+  padding: 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+}
+
+.page-header h1 {
+  margin: 0;
+  color: #333;
+}
+
+.clear-button {
+  background: #dc3545;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: opacity 0.3s;
+}
+
+.clear-button:hover {
+  opacity: 0.9;
+}
+
+.situation-form {
+  background: white;
+  padding: 2rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  margin-bottom: 2rem;
+}
+
+.situation-form h2 {
+  margin: 0 0 1.5rem 0;
+  color: #333;
+}
+
+.situation-types {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 2rem;
+  flex-wrap: wrap;
+}
+
+.type-option {
+  display: flex;
+  align-items: center;
+  padding: 1rem;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s;
+  min-width: 150px;
+  justify-content: center;
+}
+
+.type-option input {
+  display: none;
+}
+
+.type-option span {
+  font-weight: 500;
+  color: #666;
+}
+
+.type-option.active {
+  border-color: #667eea;
+  background: #f8f9ff;
+}
+
+.type-option.active span {
+  color: #667eea;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1.5rem;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.form-group.full-width {
+  grid-column: 1 / -1;
+}
+
+.form-group label {
+  margin-bottom: 0.5rem;
+  color: #555;
+  font-weight: 500;
+}
+
+.form-group input,
+.form-group textarea {
+  padding: 0.75rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 1rem;
+  transition: border-color 0.3s;
+}
+
+.form-group input:focus,
+.form-group textarea:focus {
+  outline: none;
+  border-color: #667eea;
+}
+
+.form-group input:disabled,
+.form-group textarea:disabled {
+  background-color: #f5f5f5;
+  cursor: not-allowed;
+}
+
+.submit-button {
+  grid-column: 1 / -1;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  padding: 1rem 2rem;
+  border-radius: 4px;
+  font-size: 1.1rem;
+  cursor: pointer;
+  transition: opacity 0.3s;
+  margin-top: 1rem;
+  justify-self: start;
+}
+
+.submit-button:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.submit-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.error-message {
+  background-color: #fee;
+  color: #c33;
+  padding: 1rem;
+  border-radius: 4px;
+  margin-bottom: 2rem;
+  border: 1px solid #fcc;
+}
+
+.chat-section {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  margin-bottom: 2rem;
+  overflow: hidden;
+}
+
+.chat-section h2 {
+  margin: 0;
+  padding: 1.5rem 2rem;
+  background: #f8f9fa;
+  border-bottom: 1px solid #e0e0e0;
+  color: #333;
+}
+
+.chat-container {
+  padding: 1rem;
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+.chat-message {
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  border-radius: 8px;
+}
+
+.chat-message.user {
+  background: #e3f2fd;
+  margin-left: 2rem;
+}
+
+.chat-message.assistant {
+  background: #f3e5f5;
+  margin-right: 2rem;
+}
+
+.message-header {
+  margin-bottom: 0.5rem;
+}
+
+.role-label {
+  font-weight: 600;
+  color: #333;
+  font-size: 0.9rem;
+}
+
+.message-content {
+  color: #444;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+.info-section {
+  background: white;
+  padding: 2rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.info-section h2 {
+  margin: 0 0 1.5rem 0;
+  color: #333;
+}
+
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1.5rem;
+}
+
+.info-card {
+  padding: 1.5rem;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  transition: transform 0.3s, box-shadow 0.3s;
+}
+
+.info-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.info-card h3 {
+  margin: 0 0 1rem 0;
+  color: #333;
+  font-size: 1.1rem;
+}
+
+.info-card p {
+  margin: 0;
+  color: #666;
+  line-height: 1.5;
+}
