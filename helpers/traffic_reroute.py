@@ -18,15 +18,35 @@ def extract_json(raw_text: str) -> str:
     match = re.search(r"\{.*\}", cleaned, re.DOTALL)
     return match.group(0).strip() if match else "{}"
 
+def make_json_safe(obj):
+    """Recursively make an object JSON serializable by converting tuple keys to strings."""
+    if isinstance(obj, dict):
+        safe_dict = {}
+        for k, v in obj.items():
+            if isinstance(k, tuple):
+                k = "_".join(map(str, k))   # turn tuple into "a_b"
+            else:
+                k = str(k)
+            safe_dict[k] = make_json_safe(v)
+        return safe_dict
+    elif isinstance(obj, list):
+        return [make_json_safe(x) for x in obj]
+    elif isinstance(obj, tuple):
+        return "_".join(map(str, obj))  # convert tuple values too
+    else:
+        return obj
+
+
 
 def reroute_with_traffic(traffic_routes: dict, traffic_matrix: dict) -> dict:
     """
     Calls Gemini with traffic-aware routes + traffic matrix and returns rerouted plan.
     """
 
-    traffic_routes_str = json.dumps(traffic_routes, indent=2)
-    traffic_matrix_str = json.dumps(traffic_matrix, indent=2)
-
+    # ✅ Ensure JSON serializable
+    traffic_routes_str = json.dumps(make_json_safe(traffic_routes), indent=2)
+    traffic_matrix_str = json.dumps(make_json_safe(traffic_matrix), indent=2)
+    print("Traffic matrix JSON prepared.")
     prompt = """
     You are an expert in logistics optimization and real-time traffic-aware vehicle routing.
 

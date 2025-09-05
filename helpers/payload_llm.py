@@ -2,7 +2,7 @@ def make_payload_for_llm(depot, routes, distance_lookup, customers_info, prefere
     """
     Build payload for LLM-based route refinement.
     depot: dict {id, lat, lon}
-    routes: list of lists of customers [{customer_id,...}]
+    routes: output from OR-Tools (list of dicts, each with 'route': [...])
     distance_lookup: dict with {"order": [...], "distances_km": [...], "times_min": [...]}
     customers_info: dict {cid: {...}} or list of {...}
     preferences: dict of user preferences
@@ -23,7 +23,7 @@ def make_payload_for_llm(depot, routes, distance_lookup, customers_info, prefere
             cust.update(data)
             customers.append(cust)
     else:
-        customers = list(customers_info)  # already a list
+        customers = list(customers_info)
 
     # Update customer priorities from preferences
     for cust in customers:
@@ -41,9 +41,27 @@ def make_payload_for_llm(depot, routes, distance_lookup, customers_info, prefere
 
     # Always include all vehicles (even if unused)
     for i, r in enumerate(routes):
-        payload["baseline_routes"].append({
-            "vehicle": f"V{i+1}",
-            "sequence": [c["customer_id"] for c in r]
-        })
+        if isinstance(r, dict) and "route" in r:
+            baseline_entry = {
+                "vehicle": f"V{i+1}",
+                "sequence": r.get("route", []),
+                "load": r.get("load", 0),
+                "total_distance_km": r.get("total_distance_km", 0),
+                "fuel_used_l": r.get("fuel_used_l", 0),
+                "fuel_cost": r.get("fuel_cost", 0),
+            }
+        else:
+            # fallback if routes are just lists of customers
+            seq = [c["customer_id"] if isinstance(c, dict) else c for c in r]
+            baseline_entry = {
+                "vehicle": f"V{i+1}",
+                "sequence": seq,
+                "load": 0,
+                "total_distance_km": 0,
+                "fuel_used_l": 0,
+                "fuel_cost": 0,
+            }
+
+        payload["baseline_routes"].append(baseline_entry)
 
     return payload

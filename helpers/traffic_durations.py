@@ -6,7 +6,7 @@ import os
 def get_matrix_durations(origins, destinations, api_key):
     """
     Calls Google Distance Matrix API for multiple origin-destination pairs.
-    Returns dict { (origin, destination): {"normal": secs, "traffic": secs} }
+    Returns dict { "lat1,lon1|lat2,lon2": {"normal": secs, "traffic": secs} }
     """
     departure_time = int(datetime.datetime.now().timestamp())
     origins_str = "|".join([f"{lat},{lon}" for lat, lon in origins])
@@ -30,79 +30,66 @@ def get_matrix_durations(origins, destinations, api_key):
             for j, destination in enumerate(destinations):
                 element = res["rows"][i]["elements"][j]
                 if element.get("status") == "OK":
-                    normal = element["duration"]["value"]  # seconds
+                    normal = element["duration"]["value"]
                     traffic = element.get("duration_in_traffic", element["duration"])["value"]
                 else:
                     normal, traffic = 0, 0
-                result[(origin, destination)] = {
-                    "normal": normal,
-                    "traffic": traffic
-                }
+
+                # ✅ JSON-safe key
+                key = f"{origin[0]},{origin[1]}|{destination[0]},{destination[1]}"
+                result[key] = {"normal": normal, "traffic": traffic}
     else:
         print("⚠️ Matrix Error:", res.get("status"), res.get("error_message"))
 
     return result
 
 
-def add_traffic_durations(routes_json: dict, api_key: str, cache_file="distance_cache.json"):
+def add_traffic_durations(routes_json: dict, api_key: str):
     """
     Enriches routes_json with normal + traffic durations (mins/secs).
-    Uses cache to avoid repeated API calls.
+    No caching — everything fresh per call.
     """
+    distance_lookup = {}
 
-
-    distance_cache = {}
-
-    # Step 1: collect all unique pairs
+    # Collect all pairs
     pairs_needed = set()
     for route in routes_json["refined_routes"]:
         seq = route["sequence"]
         for i in range(len(seq) - 1):
             origin = (seq[i]["lat"], seq[i]["lon"])
             destination = (seq[i+1]["lat"], seq[i+1]["lon"])
-            pairs_needed.add((origin, destination))
+            key = f"{origin[0]},{origin[1]}|{destination[0]},{destination[1]}"
+            pairs_needed.add((origin, destination, key))
 
-    # Step 2: find missing pairs
-    pairs_to_query = [pair for pair in pairs_needed if pair not in distance_cache]
-
-    # Step 3: query API if needed
-    if pairs_to_query:
-        unique_points = {pt for pair in pairs_to_query for pt in pair}
+    if pairs_needed:
+        unique_points = {pt for (origin, dest, key) in pairs_needed for pt in (origin, dest)}
         unique_points = list(unique_points)
 
-        new_durations = get_matrix_durations(unique_points, unique_points, api_key)
-        distance_cache.update(new_durations)
+        # Fetch new durations
+        distance_lookup = get_matrix_durations(unique_points, unique_points, api_key)
 
-    # Step 4: attach durations to each route
+    # Attach durations to routes
     for route in routes_json["refined_routes"]:
-        total_normal_duration = 0
-        total_traffic_duration = 0
+        total_normal = 0
+        total_traffic = 0
         seq = route["sequence"]
 
         for i in range(len(seq) - 1):
             origin = (seq[i]["lat"], seq[i]["lon"])
             destination = (seq[i+1]["lat"], seq[i+1]["lon"])
-            durations = distance_cache.get((origin, destination), {"normal": 0, "traffic": 0})
+            key = f"{origin[0]},{origin[1]}|{destination[0]},{destination[1]}"
+            durations = distance_lookup.get(key, {"normal": 0, "traffic": 0})
 
-            if isinstance(durations, int):
-                normal_val = durations
-                traffic_val = durations
-            else:
-                normal_val = durations.get("normal", 0)
-                traffic_val = durations.get("traffic", 0)
+            total_normal += durations.get("normal", 0)
+            total_traffic += durations.get("traffic", 0)
 
-            total_normal_duration += normal_val
-            total_traffic_duration += traffic_val
-
-        # Add to metrics
         route.setdefault("metrics", {})
-        route["metrics"]["total_normal_duration_secs"] = total_normal_duration
-        route["metrics"]["total_normal_duration_mins"] = round(total_normal_duration / 60, 2)
-        route["metrics"]["total_traffic_duration_secs"] = total_traffic_duration
-        route["metrics"]["total_traffic_duration_mins"] = round(total_traffic_duration / 60, 2)
+        route["metrics"]["total_normal_duration_secs"] = total_normal
+        route["metrics"]["total_normal_duration_mins"] = round(total_normal / 60, 2)
+        route["metrics"]["total_traffic_duration_secs"] = total_traffic
+        route["metrics"]["total_traffic_duration_mins"] = round(total_traffic / 60, 2)
+        
+    print(routes_json)
+    print(distance_lookup)
 
-    # Save updated cache
-    with open(cache_file, "w") as f:
-        json.dump({str(k): v for k, v in distance_cache.items()}, f, indent=2)
-
-    return routes_json, distance_cache
+    return routes_json, distance_lookup
