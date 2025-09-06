@@ -498,6 +498,40 @@ def solve_routes():
     }), 200
 
 
+# ------------------------------------------------
+# 📌 Get All Trip IDs + Created At for Logged-in User (JWT version)
+# ------------------------------------------------
+@app.route("/api/routes/trip-ids", methods=["GET"])
+@require_auth
+def get_all_trip_ids():
+    """Fetch all trip_ids with created_at for the logged-in user from the Route table."""
+    supabase_uid = request.user_id   # comes from JWT
+
+    # Find user in DB
+    user = User.query.filter_by(user_id=supabase_uid).first()
+    if not user:
+        return jsonify({"status": "error", "message": "User not found"}), 404
+
+    # Fetch all routes for this user (newest first)
+    routes = Route.query.filter_by(user_id=user.id).order_by(desc(Route.created_at)).all()
+    if not routes:
+        return jsonify({"status": "success", "trip_ids": []}), 200
+
+    # Build response with trip_id and created_at
+    trip_list = [
+        {
+            "trip_id": r.trip_id,
+            "created_at": r.created_at.isoformat() if r.created_at else None
+        }
+        for r in routes
+    ]
+
+    return jsonify({
+        "status": "success",
+        "trip_ids": trip_list,
+        "count": len(trip_list)
+    }), 200
+
 
 # ------------------------------------------------
 # 📌 Get Latest Route for Logged-in User (JWT version)
@@ -579,9 +613,9 @@ situation_chat_history = {}
 # ------------------------------------------------
 # 📌 Situation Recommendation (JWT version)
 # ------------------------------------------------
-@app.route("/api/situation/recommend", methods=["POST"])
+@app.route("/api/situation/recommend/<tripid>", methods=["POST"])
 @require_auth
-def situation_recommend():
+def situation_recommend(tripid):
     """Interactive dispatcher chatbot for situation handling (JWT auth)."""
     supabase_uid = request.user_id   # from JWT
 
@@ -600,10 +634,10 @@ def situation_recommend():
             "message": "vehicle_id and near_customer are required"
         }), 400
 
-    # Get latest route for context
-    latest_route = Route.query.filter_by(user_id=user.id).order_by(desc(Route.created_at)).first()
+    # Get latest route for context (searching by trip id as requested)
+    latest_route = Route.query.filter_by(user_id=user.id, trip_id=tripid).order_by(desc(Route.created_at)).first()
     if not latest_route:
-        return jsonify({"status": "error", "message": "No route found for this user"}), 404
+        return jsonify({"status": "error", "message": f"No route found for this user and trip id {tripid}"}), 404
 
     # Build user message
     user_message = f"Vehicle {vehicle_id} reported near {near_customer}. {note}"
@@ -637,16 +671,16 @@ def situation_recommend():
         "chat_history": situation_chat_history[supabase_uid]
     }), 200
 
-    
+
 # In-memory store for fuel conversations (per user)
 fuel_chat_history = {}
 
 # ------------------------------------------------
 # 📌 Situation Fuel (JWT version)
 # ------------------------------------------------
-@app.route("/api/situation/fuel", methods=["POST"])
+@app.route("/api/situation/fuel/<tripid>", methods=["POST"])
 @require_auth
-def situation_fuel():
+def situation_fuel(tripid):
     """Conversational fuel/energy management assistant (JWT auth)."""
     supabase_uid = request.user_id   # from JWT
 
@@ -665,10 +699,10 @@ def situation_fuel():
             "message": "vehicle_id and near_customer are required"
         }), 400
 
-    # Fetch latest route
-    latest_route = Route.query.filter_by(user_id=user.id).order_by(desc(Route.created_at)).first()
+    # Fetch latest route (filter by trip id)
+    latest_route = Route.query.filter_by(user_id=user.id, trip_id=tripid).order_by(desc(Route.created_at)).first()
     if not latest_route:
-        return jsonify({"status": "error", "message": "No route found"}), 404
+        return jsonify({"status": "error", "message": f"No route found for trip id {tripid}"}), 404
 
     # Build user message
     user_message = f"Fuel situation: Vehicle {vehicle_id} is near {near_customer}. {note}"
@@ -704,17 +738,15 @@ def situation_fuel():
     }), 200
 
 
-
-
 # In-memory store for fatigue conversations (per user)
 fatigue_chat_history = {}
 
 # ------------------------------------------------
 # 📌 Situation Fatigue (JWT version)
 # ------------------------------------------------
-@app.route("/api/situation/fatigue", methods=["POST"])
+@app.route("/api/situation/fatigue/<tripid>", methods=["POST"])
 @require_auth
-def situation_fatigue():
+def situation_fatigue(tripid):
     """Handle fatigue/compliance issues with chat-style recommendations (JWT auth)."""
     supabase_uid = request.user_id   # from JWT
 
@@ -733,10 +765,10 @@ def situation_fatigue():
             "message": "vehicle_id and near_customer are required"
         }), 400
 
-    # Get latest route
-    latest_route = Route.query.filter_by(user_id=user.id).order_by(desc(Route.created_at)).first()
+    # Get latest route (filter by trip id)
+    latest_route = Route.query.filter_by(user_id=user.id, trip_id=tripid).order_by(desc(Route.created_at)).first()
     if not latest_route:
-        return jsonify({"status": "error", "message": "No route found"}), 404
+        return jsonify({"status": "error", "message": f"No route found for trip id {tripid}"}), 404
 
     # Maintain conversation in memory
     if supabase_uid not in fatigue_chat_history:
@@ -764,6 +796,7 @@ def situation_fatigue():
         "recommendation": recommendation,
         "conversation": fatigue_chat_history[supabase_uid]  # full chat for frontend display
     }), 200
+
 
 
 

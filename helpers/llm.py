@@ -49,7 +49,8 @@ def build_prompt_from_payload(payload):
         "   - fuel_used_l = estimated liters used for this route.\n"
         "   - fuel_cost = fuel_used_l * assumed_price_per_liter.\n"
         "   - eco_score = qualitative efficiency score (low/medium/high).\n"
-        "6. Output must be clean JSON only (no commentary, no markdown).\n"
+        "6. Provide brief notes explaining key decisions (e.g., avoided X, prioritized Y).\n"
+        "7. Output must be clean JSON only (no commentary, no markdown).\n"
     )
     return instr + "\n\nINPUT:\n" + json.dumps(payload, indent=2)
 
