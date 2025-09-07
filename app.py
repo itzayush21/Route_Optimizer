@@ -36,7 +36,8 @@ app = Flask(__name__)
 CORS(app, origins=[
     "http://localhost:5173",
     "http://127.0.0.1:5173",
-    "http://10.53.178.140:5173"
+    "http://10.53.178.140:5173",
+    "https://d2wzvctg4ipy6w.cloudfront.net/"
 ], allow_headers=["Content-Type", "Authorization"])
 
 S3_BUCKET = os.getenv("S3_BUCKET_NAME", "your-bucket-name")
