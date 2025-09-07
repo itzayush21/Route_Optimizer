@@ -1,4 +1,4 @@
-from ortools.constraint_solver import pywrapcp, routing_enums_pb2
+'''from ortools.constraint_solver import pywrapcp, routing_enums_pb2
 from helpers.dist_comp import compute_distance_matrix
 
 def ortools_vrp(
@@ -107,4 +107,149 @@ def ortools_vrp(
                 "fuel_cost": round(cost, 2)
             })
 
+    return routes'''
+    
+    
+from ortools.constraint_solver import pywrapcp, routing_enums_pb2
+from helpers.dist_comp import compute_distance_matrix
+
+def ortools_vrp(
+    depot,
+    customers,
+    num_vehicles=3,
+    vehicle_capacity=200,
+    mileage=15,
+    fuel_price=1.35,
+    tank_size=45,
+    time_limit=10
+):
+    """
+    Tries refuel-aware solve first; if that returns no solution,
+    re-runs the solver WITHOUT any fuel dimension and returns that result.
+    Returns: {"routes": [...], "diagnostics": {...}}
+    """
+    diagnostics = {"attempts": []}
+
+    # inner builder that can optionally add fuel (use_fuel=True/False)
+    def build_and_solve(use_fuel: bool):
+        dist_matrix,_,_= compute_distance_matrix(depot, customers)
+        print(f"Distance matrix computed {len(dist_matrix)}x{len(dist_matrix)}, {dist_matrix}")
+        n = len(dist_matrix)
+        if n == 0:
+            return None, None, None  # no problem
+
+        demands = [0] + [int(round(c.get("weight", 0))) for c in customers]
+        manager = pywrapcp.RoutingIndexManager(n, int(num_vehicles), 0)
+        routing = pywrapcp.RoutingModel(manager)
+
+        # distance callback (meters)
+        def distance_callback(from_index, to_index):
+            frm = manager.IndexToNode(from_index)
+            to = manager.IndexToNode(to_index)
+            return int(round(dist_matrix[frm][to] * 1000.0))
+
+        dist_cb_idx = routing.RegisterTransitCallback(distance_callback)
+        routing.SetArcCostEvaluatorOfAllVehicles(dist_cb_idx)
+
+        # capacity
+        def demand_callback(from_index):
+            return int(demands[manager.IndexToNode(from_index)])
+        demand_cb_idx = routing.RegisterUnaryTransitCallback(demand_callback)
+        routing.AddDimensionWithVehicleCapacity(
+            demand_cb_idx,
+            0,
+            [int(vehicle_capacity)] * int(num_vehicles),
+            True,
+            "Capacity"
+        )
+
+        # optional fuel (remaining) model with refuel nodes if requested
+        fuel_dim = None
+        if use_fuel:
+            tank_size_ml = int(round(tank_size * 1000.0))
+            mileage_f = float(mileage)
+            all_nodes = [depot] + customers
+            refuel_nodes = [i for i, node in enumerate(all_nodes) if node.get("is_fuel", False)]
+
+            def fuel_remaining_callback(from_index, to_index):
+                frm = manager.IndexToNode(from_index)
+                to = manager.IndexToNode(to_index)
+                distance_km = float(dist_matrix[frm][to])
+                travel_ml = int(round((distance_km / mileage_f) * 1000.0))
+                net = -travel_ml
+                if to in refuel_nodes:
+                    net += tank_size_ml
+                return net
+
+            fuel_cb_idx = routing.RegisterTransitCallback(fuel_remaining_callback)
+            routing.AddDimension(
+                fuel_cb_idx,
+                0,
+                tank_size_ml,
+                False,
+                "FuelRemain"
+            )
+            fuel_dim = routing.GetDimensionOrDie("FuelRemain")
+            # set start full tank
+            for v in range(int(num_vehicles)):
+                fuel_dim.CumulVar(routing.Start(v)).SetValue(tank_size_ml)
+
+        # solve
+        search_params = pywrapcp.DefaultRoutingSearchParameters()
+        search_params.first_solution_strategy = routing_enums_pb2.FirstSolutionStrategy.PATH_CHEAPEST_ARC
+        search_params.local_search_metaheuristic = routing_enums_pb2.LocalSearchMetaheuristic.GUIDED_LOCAL_SEARCH
+        search_params.time_limit.seconds = int(time_limit)
+
+        solution = routing.SolveWithParameters(search_params)
+        return solution, routing, manager
+
+    # Attempt 1: with fuel
+    diagnostics["attempts"].append("try_with_fuel")
+    sol, routing, manager = build_and_solve(use_fuel=True)
+    if sol:
+        diagnostics["result"] = "solution_with_fuel"
+        diagnostics["used_fuel_model"] = True
+    else:
+        # Attempt 2: without fuel
+        diagnostics["attempts"].append("retry_without_fuel")
+        sol, routing, manager = build_and_solve(use_fuel=False)
+        if sol:
+            diagnostics["result"] = "solution_without_fuel"
+            diagnostics["used_fuel_model"] = False
+        else:
+            diagnostics["result"] = "no_solution_even_without_fuel"
+            return {"routes": [], "diagnostics": diagnostics}
+
+    # extract routes from the found solution
+    routes = []
+    mileage_f = float(mileage)
+    for v in range(int(num_vehicles)):
+        route_ids = []
+        load = 0
+        dist_m = 0
+        index = routing.Start(v)
+        while not routing.IsEnd(index):
+            node = manager.IndexToNode(index)
+            if node != 0:
+                cust = customers[node - 1]
+                route_ids.append(cust["customer_id"])
+                load += int(round(cust.get("weight", 0)))
+            next_index = sol.Value(routing.NextVar(index))
+            dist_m += int(routing.GetArcCostForVehicle(index, next_index, v))
+            index = next_index
+
+        km = float(dist_m) / 1000.0
+        liters_used = km / mileage_f if km > 0 else 0.0
+        cost = liters_used * float(fuel_price)
+
+        routes.append({
+            "vehicle_id": int(v),
+            "route": route_ids,
+            "load": int(load),
+            "total_distance_km": round(km, 3),
+            "fuel_used_l": round(liters_used, 3),
+            "fuel_cost": round(cost, 2)
+        })
+
     return routes
+

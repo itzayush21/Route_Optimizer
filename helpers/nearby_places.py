@@ -1,6 +1,6 @@
 import requests
 
-def get_nearby_places(lat, lng, place_type, api_key, radius=5000, limit=2):
+def get_nearby_places(lat, lng, place_type, api_key, radius=5000, limit=5):
     """
     Fetch nearby places (petrol stations, repair shops, etc.)
     Returns a list of dicts with name, lat, lon, address
