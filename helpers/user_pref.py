@@ -21,10 +21,14 @@ def get_user_preferences(user_input: str, model_name="gemini-1.5-flash"):
       "priority_customers": [list of customer IDs or []],
       "avoid_zones": [list of region/local authority names or []],
       "fairness": true/false,
-      "eco_mode": true/false
+      "eco_mode": true/false,
+      "Other": "any other relevant preferences"
     }}
 
     Rules:
+    - assign customer IDs to priority_customers only if explicitly mentioned.
+    - assign region/local authority names to avoid_zones only if explicitly mentioned.
+    - Provide Other only if any relevant info is given.
     - Output only valid JSON (no markdown, no commentary).
     - Use [] for empty lists.
     """

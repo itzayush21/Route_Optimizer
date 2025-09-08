@@ -37,10 +37,12 @@ CORS(app, origins=[
     "http://localhost:5173",
     "http://127.0.0.1:5173",
     "http://10.53.178.140:5173",
-    "https://d2wzvctg4ipy6w.cloudfront.net/"
+    "https://d2wzvctg4ipy6w.cloudfront.net/",
+    "http://routerfrontend.s3-website-us-east-1.amazonaws.com/"
 ], allow_headers=["Content-Type", "Authorization"])
 
 S3_BUCKET = os.getenv("S3_BUCKET_NAME", "your-bucket-name")
+USE_S3 = False
 app.config["SQLALCHEMY_DATABASE_URI"] = Config.DB_URI
 app.config["SQLALCHEMY_ENGINE_OPTIONS"] = Config.ENGINE_OPTIONS
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -207,11 +209,12 @@ def extract_orders_to_nodes():
         return jsonify({"status": "error", "message": "User not found"}), 404
 
     # Get pending orders for that manager’s warehouse
-    
     orders = Order.query.filter_by(warehouse_id=user.warehouse, status="pending").all()
     if not orders:
         print("No pending orders")
         return jsonify({"status": "success", "message": "No pending orders for this warehouse"}), 200
+
+    extracted_nodes = []  # to store customer_id + demand for response
 
     for o in orders:
         node = Node(
@@ -227,11 +230,17 @@ def extract_orders_to_nodes():
         )
         db.session.add(node)
 
+        extracted_nodes.append({
+            "customer_id": o.customer_id if hasattr(o, "customer_id") else o.id,  # fallback to order id
+            "demand": o.package_weight
+        })
+
     db.session.commit()
 
     return jsonify({
         "status": "success",
-        "message": f"{len(orders)} orders extracted to nodes"
+        "message": f"{len(orders)} orders extracted to nodes",
+        "nodes": extracted_nodes
     }), 201
 
 
@@ -384,21 +393,63 @@ def solve_routes():
     num_vehicles=num_vehicles,
     vehicle_capacity=vehicle_capacity,
     mileage=mileage or 15,
-    fuel_price=110,
+    fuel_price=1.35,
     tank_size=fuel_required or 45
 )
 
     print("Baseline routes computed.")
     print(baseline)
     # ----------------------------
+    # 3.a Check OR-Tools result for feasibility (supports both dict or list returns)
+    # ----------------------------
+    def _ortools_no_solution(baseline_obj):
+        # New-style: dict with "routes" and "diagnostics"
+        if isinstance(baseline_obj, dict):
+            routes = baseline_obj.get("routes")
+            diagnostics = baseline_obj.get("diagnostics")
+            # treat explicit empty routes or diagnostic no_solution as failure
+            if (isinstance(routes, (list, dict)) and len(routes) == 0) or \
+               (isinstance(diagnostics, dict) and "no_solution" in str(diagnostics.get("result", "")).lower()):
+                return True
+            # sometimes diagnostics.attempts contains a hint
+            attempts = diagnostics.get("attempts") if isinstance(diagnostics, dict) else None
+            if attempts and any("no_solution" in str(a).lower() or "no solution" in str(a).lower() for a in attempts):
+                return True
+            return False
+
+        # Older-style: list of route dicts (empty list => no solution)
+        if isinstance(baseline_obj, list):
+            return len(baseline_obj) == 0
+
+        # anything falsy / unexpected => treat as no-solution
+        return not bool(baseline_obj)
+
+    if _ortools_no_solution(baseline):
+        diag = None
+        if isinstance(baseline, dict):
+            diag = baseline.get("diagnostics")
+        print("OR-Tools found no feasible solution:", diag)
+        return jsonify({
+            "status": "error",
+            "message": "Route not possible; trying increase vehicles or capacity",
+            "diagnostics": diag
+        }), 500
+    # ----------------------------
     # 4. Enrich + Distances
     # ----------------------------
     print("Enriching customers with traffic data and building distance lookup...")
-    df1, df2, df3 = (
-        read_csv_from_s3(S3_BUCKET, "local_authority_traffic.csv"),
-        read_csv_from_s3(S3_BUCKET, "region_traffic.csv"),
-        read_csv_from_s3(S3_BUCKET, "dft_traffic_counts_raw_counts.csv")
-    )
+    if USE_S3:
+        df1, df2, df3 = (
+            read_csv_from_s3(S3_BUCKET, "local_authority_traffic.csv"),
+            read_csv_from_s3(S3_BUCKET, "region_traffic.csv"),
+            read_csv_from_s3(S3_BUCKET, "dft_traffic_counts_raw_counts.csv")
+        )
+    else:
+        df1, df2, df3 = (
+            pd.read_csv("data/local_authority_traffic.csv"),
+            pd.read_csv("data/region_traffic.csv"),
+            pd.read_csv("data/dft_traffic_counts_raw_counts.csv")
+        )
     print("CSV files loaded from S3")
     customers_info = enrich_customers(customers, df1, df2, df3)
     distance_lookup = build_distance_lookup(depot, customers)
@@ -410,13 +461,6 @@ def solve_routes():
     preferences = get_user_preferences(preference)
     payload = make_payload_for_llm(depot, baseline, distance_lookup, customers_info, preferences)
     
-    print("Payload for LLM constructed.")
-    payload["user_preferences_table"] = {
-        "priority_customers": preferences.get("priority_customers", []),
-        "avoid_zones": preferences.get("avoid_zones", []),
-        "fairness": preferences.get("fairness", False),
-        "eco_mode": preferences.get("eco_mode", False)
-    }
     
     with open("llm_payload.json", "w", encoding="utf-8") as f:
         json.dump(payload, f, indent=4, ensure_ascii=False)
@@ -573,9 +617,7 @@ def get_route(trip_id=None):
 # ------------------------------------------------
 # 📌 Reset Processed Nodes to Pending (Utility/Test) REMOVE AFTER WARDS
 # ------------------------------------------------
-# ------------------------------------------------
-# 📌 Reset Processed Nodes to Pending (JWT version)
-# ------------------------------------------------
+
 @app.route("/api/nodes/reset-pending", methods=["POST"])
 @require_auth
 def reset_nodes_to_pending():
